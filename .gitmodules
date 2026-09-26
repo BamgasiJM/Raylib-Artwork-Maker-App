@@ -1,0 +1,7 @@
+[submodule "third_party/imgui"]
+	path = third_party/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "third_party/rlImGui"]
+	path = third_party/rlImGui
+	url = https://github.com/raylib-extras/rlImGui.git
+	branch = RL60ImGui19207
