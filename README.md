@@ -394,6 +394,109 @@ make art NAME=fireworks
 
 ---
 
+## 9-2. 왜 apps/는 C++인가?
+
+`artworks/`는 순수 C로 작성되지만, `apps/`는 C++입니다. 그 이유는:
+
+### 라이브러리 의존성
+
+- **Dear ImGui**: C++ 라이브러리
+  - 모든 소스(`imgui.cpp`, `imgui_draw.cpp`, `imgui_widgets.cpp` 등)가 C++
+  - 클래스, 네임스페이스, C++ 기능 사용
+  
+- **rlImGui**: Dear ImGui의 raylib 백엔드
+  - `rlImGui.cpp`가 C++
+  - Dear ImGui를 호출하기 위해 C++로 작성됨
+
+### C와 C++의 호환성
+
+**C 코드에서 C++ 라이브러리를 직접 호출할 수 없습니다.**
+
+따라서 ImGui를 사용하는 코드는 C++로 작성해야 합니다.
+
+```cpp
+// C++에서는 이렇게 사용 가능
+ImGui::SliderFloat("Speed", &speed, 0.0f, 10.0f);
+ImGui::Button("Reset");
+```
+
+```c
+// C에서는 위 코드를 컴파일할 수 없음
+// (C++ 문법이기 때문)
+```
+
+### 프로젝트 구조의 의미
+
+```
+raylib-art/
+├── artworks/       (C)   순수 C, raylib만 사용, GUI 없음 → 결과물 아카이브
+└── apps/           (C++) C++, raylib + ImGui 사용 → 실시간 파라미터 튜닝
+```
+
+Makefile에서 `CC`(C 컴파일러)와 `CXX`(C++ 컴파일러)를 분리한 이유입니다.
+
+### 대안
+
+만약 순수 C로만 하고 싶다면:
+
+1. **cimgui 사용** — Dear ImGui의 C 바인딩 (커뮤니티 유지, 문서 적음)
+2. **다른 C GUI 라이브러리** — nuklear, raylib 내장 UI (기능이 제한적)
+
+하지만 **rlImGui + Dear ImGui** 조합이 raylib 생태계에서 사실상 표준이므로, C++를 선택하는 것이 가장 실용적입니다.
+
+---
+
+## 9-3. 예제: particle_tuner.cpp
+
+`apps/particle_tuner.cpp`는 플로우 필드를 따라 움직이는 파티클을 시뮬레이션하고, ImGui 슬라이더로 파라미터를 실시간으로 조정하는 예제입니다.
+
+```bash
+make app NAME=particle_tuner
+```
+
+### 주요 기능
+
+- **플로우 필드**: 화면을 60×60 그리드로 나누고, 각 셀마다 방향 벡터 저장
+- **파티클 물리**: 가속도 → 속도 → 위치 순서로 매 프레임 업데이트
+- **sin/cos 조합**: 시간에 따라 변하는 부드러운 물결 패턴 생성
+
+### ImGui 파라미터
+
+| 파라미터 | 범위 | 설명 |
+|---------|------|------|
+| Time Speed | 0.0 ~ 0.02 | 플로우 필드 변화 속도 |
+| Acceleration | 0.1 ~ 1.5 | 파티클이 받는 힘의 크기 |
+| Spatial Freq | 0.01 ~ 0.3 | 플로우 패턴의 촘촘함 |
+| Particle Radius | 0.5 ~ 5.0 | 화면에 그려지는 파티클 크기 |
+| Trail Alpha | 0 ~ 50 | 잔상 효과 투명도 |
+| Particle Count | 100 ~ 5000 | 실제 렌더링할 파티클 개수 |
+
+### 코드 구조
+
+```cpp
+// 1. 파티클 구조체
+typedef struct {
+    Vector2 position;      // 위치
+    Vector2 velocity;      // 속도
+    Vector2 acceleration;  // 가속도
+    float maxSpeed;        // 최대 속도
+    Color color;           // 색상
+} Particle;
+
+// 2. 플로우 필드 (60x60 그리드)
+Vector2 flowField[COLS][ROWS];
+
+// 3. 매 프레임:
+// - 플로우 필드 업데이트 (sin/cos 조합)
+// - 파티클 물리 시뮬레이션 (가속도 적용, 속도 제한)
+// - raylib 렌더링 (파티클 그리기)
+// - ImGui 패널 (파라미터 조정)
+```
+
+슬라이더를 움직이며 각 파라미터가 시각화에 어떻게 영향을 미치는지 관찰하면서 학습할 수 있습니다.
+
+---
+
 ## 10. 다음 단계: C와 Generative Art
 
 현재 프로그램은 단순히 원 하나를 그립니다.
