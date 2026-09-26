@@ -1,362 +1,215 @@
-# raylib C Generative Art on macOS
+# raylib-art: 제너레이티브 아트 실험 플랫폼
 
-macOS에서 Homebrew로 raylib을 설치하고, Apple Clang을 사용하여 C 언어로 raylib 프로그램을 빌드하고 실행하는 가장 기본적인 환경을 구성합니다.
+## 1. 프로젝트의 목적
 
-이 문서는 다음 환경을 기준으로 합니다.
+이 프로젝트는 **raylib**을 사용하여 제너레이티브 아트(generative art)를 만들고 실험하는 환경을 제공합니다.
 
-- macOS Intel
-- Visual Studio Code
-- Apple Clang
-- Homebrew
-- raylib
-- Make
+### 세 가지 워크플로우
 
-목표는 IDE의 자동화 기능에 의존하기보다 먼저 `clang` 명령어로 직접 빌드 과정을 이해하고, 이후 간단한 `Makefile`로 반복 작업을 줄이는 것입니다.
+1. **빠른 실험** (`src/main.c`) — 새로운 아이디어를 즉시 테스트
+2. **결과 아카이빙** (`artworks/`) — 완성된 작품을 보관
+3. **파라미터 튜닝** (`apps/`) — ImGui로 실시간 파라미터 조정
+
+이 구조를 통해 개발부터 배포까지 체계적으로 진행할 수 있습니다.
 
 ---
 
-## 1. 개발 환경 확인
+## 2. 프로젝트 설정
 
-### Clang 확인
+### macOS 환경 설정
 
-터미널에서 다음을 실행합니다.
-
-```bash
-clang --version
-```
-
-macOS에서는 Apple Clang을 기본 C 컴파일러로 사용할 수 있습니다.
-
-Clang이 설치되어 있지 않다면 다음 명령으로 Command Line Tools를 설치합니다.
+#### 2-1. 필수 도구 설치
 
 ```bash
+# Xcode Command Line Tools 확인
 xcode-select --install
-```
 
-설치 후 다시 확인합니다.
-
-```bash
-clang --version
-```
-
-### Homebrew 확인
-
-```bash
+# Homebrew 확인
 brew --version
-```
 
-Homebrew가 설치되어 있지 않다면 공식 설치 안내를 참고합니다.
-
-Intel Mac에서는 Homebrew가 일반적으로 `/usr/local` 아래에 설치됩니다.
-
-설치 위치는 다음 명령으로 확인할 수 있습니다.
-
-```bash
-which brew
-```
-
----
-
-## 2. raylib 설치
-
-Homebrew를 사용하여 raylib을 설치합니다.
-
-```bash
+# raylib 설치
 brew install raylib
-```
 
-설치가 완료되면 다음 명령으로 확인합니다.
-
-```bash
-brew info raylib
-```
-
-그리고 `pkg-config`를 통해 raylib의 컴파일 및 링크 옵션이 정상적으로 확인되는지 테스트합니다.
-
-```bash
+# 설치 확인
 pkg-config --cflags --libs raylib
 ```
 
-출력에는 시스템에 설치된 raylib의 include 경로와 library 경로, 링크 옵션 등이 포함됩니다.
-
-예를 들어 다음과 비슷한 형태입니다.
-
-```text
--I/usr/local/include -L/usr/local/lib -lraylib ...
-```
-
-정확한 출력은 Homebrew 및 raylib 버전에 따라 달라질 수 있습니다.
-
----
-
-## 3. 프로젝트 생성
-
-연습 프로젝트를 다음과 같은 구조로 만듭니다.
-
-```text
-raylib-art/
-├── src/
-│   └── main.c
-├── build/
-└── Makefile
-```
-
-터미널에서:
+#### 2-2. 저장소 클론 및 submodule 초기화
 
 ```bash
-mkdir -p ~/Documents/dev/raylib-art/src
-cd ~/Documents/dev/raylib-art
-mkdir build
+git clone <repository-url>
+cd raylib-art
+
+# Dear ImGui와 rlImGui submodule 초기화
+git submodule update --init --recursive
 ```
 
-VS Code로 프로젝트를 엽니다.
-
-```bash
-code .
-```
-
-`code` 명령어가 등록되어 있지 않다면 VS Code에서 직접 프로젝트 폴더를 열어도 됩니다.
-
----
-
-## 4. 첫 번째 raylib 프로그램
-
-`src/main.c` 파일을 만들고 다음 코드를 작성합니다.
-
-```c
-#include "raylib.h"
-
-int main(void)
-{
-    InitWindow(800, 600, "Raylib Generative Art");
-
-    SetTargetFPS(60);
-
-    while (!WindowShouldClose())
-    {
-        BeginDrawing();
-
-        ClearBackground(BLACK);
-
-        DrawCircle(400, 300, 100, RAYWHITE);
-
-        EndDrawing();
-    }
-
-    CloseWindow();
-
-    return 0;
-}
-```
-
-이 프로그램의 기본 실행 구조는 다음과 같습니다.
-
-```text
-InitWindow()
-    ↓
-게임/그래픽 루프
-    ↓
-BeginDrawing()
-    ↓
-Draw...
-    ↓
-EndDrawing()
-    ↓
-CloseWindow()
-```
-
-`InitWindow()`로 창을 만들고, `while` 루프에서 매 프레임 그림을 그립니다.
-
-`WindowShouldClose()`는 창 닫기 이벤트 등을 확인합니다.
-
----
-
-## 5. clang으로 직접 빌드하기
-
-처음에는 Makefile을 사용하지 않고 C 컴파일러를 직접 실행합니다.
-
-프로젝트 루트에서 다음 명령을 실행합니다.
-
-```bash
-clang src/main.c -o build/main $(pkg-config --cflags --libs raylib)
-```
-
-여기서 중요한 부분은 다음과 같습니다.
-
-```text
-clang
-  ↓
-src/main.c
-  ↓
-raylib의 include / library 정보
-  ↓
-build/main
-```
-
-`pkg-config`는 현재 설치된 raylib에 필요한 컴파일 및 링크 옵션을 제공해 줍니다.
-
-빌드가 성공하면 `build/main` 실행 파일이 생성됩니다.
-
-실행합니다.
-
-```bash
-./build/main
-```
-
-800×600 크기의 창이 나타나고 가운데에 원이 표시되면 성공입니다.
-
----
-
-## 6. clang 명령어의 의미
-
-다음 명령을 다시 살펴보면:
-
-```bash
-clang src/main.c -o build/main $(pkg-config --cflags --libs raylib)
-```
-
-각 부분은 다음 의미를 갖습니다.
-
-```text
-clang
-```
-
-C 컴파일러입니다.
-
-```text
-src/main.c
-```
-
-컴파일할 C 소스 파일입니다.
-
-```text
--o build/main
-```
-
-컴파일 결과의 실행 파일 이름과 위치를 지정합니다.
-
-```text
-$(pkg-config --cflags --libs raylib)
-```
-
-raylib을 컴파일하고 링크하는 데 필요한 옵션을 `pkg-config`로 가져옵니다.
-
-즉, 이 명령을 이해하는 것이 중요합니다.
-
-Makefile은 결국 이 긴 명령을 반복해서 입력하지 않도록 정리하는 도구일 뿐입니다.
-
----
-
-## 7. Makefile 만들기
-
-프로젝트 루트에 `Makefile`을 만듭니다.
-
-```makefile
-CC = clang
-CFLAGS = -Wall -Wextra -std=c17
-LIBS = $(shell pkg-config --cflags --libs raylib)
-
-SRC = src/main.c
-OUT = build/main
-
-all:
-	$(CC) $(CFLAGS) $(SRC) -o $(OUT) $(LIBS)
-
-run: all
-	./$(OUT)
-
-clean:
-	rm -f $(OUT)
-```
-
-주의할 점은 Makefile의 명령어 앞에 들어가는 공백이 반드시 Tab 문자여야 한다는 것입니다.
-
-예를 들어 다음 부분의 `$(CC)` 앞에는 Tab이 들어가야 합니다.
-
-```makefile
-all:
-	$(CC) $(CFLAGS) $(SRC) -o $(OUT) $(LIBS)
-```
-
----
-
-## 8. Makefile로 빌드
-
-이제 다음 명령만 실행하면 됩니다.
-
-```bash
-make
-```
-
-실제로는 다음과 같은 작업이 실행됩니다.
-
-```text
-src/main.c
-    ↓
-clang
-    ↓
-raylib library linking
-    ↓
-build/main
-```
-
-실행:
-
-```bash
-./build/main
-```
-
-또는 빌드와 실행을 한 번에:
+#### 2-3. 빌드 확인
 
 ```bash
 make run
 ```
 
-빌드 결과를 삭제하려면:
+---
+
+### Windows 환경 설정
+
+Windows에서는 다음 중 하나를 선택하세요.
+
+#### 옵션 A: MinGW + MSYS2 (권장)
 
 ```bash
-make clean
+# MSYS2 설치 후 터미널에서
+pacman -S mingw-w64-x86_64-raylib
+pacman -S mingw-w64-x86_64-clang
+pacman -S make
+pacman -S git
+```
+
+저장소 클론:
+```bash
+git clone <repository-url>
+cd raylib-art
+git submodule update --init --recursive
+make run
+```
+
+#### 옵션 B: Visual Studio + CMake
+
+1. **Visual Studio 2022** 설치 (C++ 워크로드 포함)
+2. **raylib 바이너리** 다운로드: https://github.com/raysan5/raylib/releases
+3. 프로젝트 폴더에 `raylib/` 복사
+4. CMakeLists.txt 생성 (또는 Visual Studio 프로젝트 수동 설정)
+5. 빌드 및 실행
+
+#### 옵션 C: WSL (Windows Subsystem for Linux)
+
+WSL에서 macOS 설정을 동일하게 적용:
+```bash
+wsl
+sudo apt-get update
+sudo apt-get install libraylib-dev clang make git
+# 이후 macOS와 동일한 단계 진행
 ```
 
 ---
 
-## 9. 현재 프로젝트 구조
+## 3. 프로젝트 구조
 
-```text
+```
 raylib-art/
 ├── src/
-│   └── main.c          # 현재 실험 중인 코드 (순수 C)
-├── artworks/            # 마음에 든 결과물을 이름 바꿔 아카이빙 (순수 C)
-│   └── *.c
-├── apps/                # imGui 컨트롤 패널이 있는 실험용 앱 (C++)
-│   └── example_app.cpp
+│   └── main.c              # 실험 스크래치패드 (순수 C)
+├── artworks/
+│   ├── particle_noise_field.c
+│   ├── fireworks.c
+│   └── ...                 # 완성된 작품들 (순수 C)
+├── apps/
+│   ├── example_app.cpp     # ImGui 기본 템플릿 (C++)
+│   └── particle_tuner.cpp  # 파라미터 튜닝 앱 (C++)
 ├── shaders/
+│   ├── basic/
+│   │   ├── vert.glsl
+│   │   └── frag.glsl
+│   └── ...
 ├── third_party/
-│   ├── imgui/            # Dear ImGui (git submodule)
-│   └── rlImGui/          # raylib용 imGui 백엔드 (git submodule)
-├── build/
+│   ├── imgui/              # Dear ImGui (git submodule)
+│   └── rlImGui/            # raylib용 ImGui 백엔드 (git submodule)
+├── build/                  # 컴파일 결과물 (.gitignore)
 └── Makefile
 ```
 
-`build/`는 컴파일 시 자동 생성되는 실행 파일이므로 커밋하지 않습니다 (`.gitignore`에 등록됨).
+### 폴더별 역할
 
-이 저장소를 새로 클론했다면 submodule도 함께 받아야 합니다.
+#### `src/` — 실험 스크래치패드
 
-```bash
-git submodule update --init --recursive
-```
+- **목적**: 새로운 아이디어를 빠르게 테스트
+- **언어**: 순수 C (raylib만 사용)
+- **특징**: GUI 없음, 결과 재생만
+- **용도**: 알고리즘 개발, 원형 제작
+- **빌드**: `make run`
+
+#### `artworks/` — 결과물 아카이브
+
+- **목적**: 완성된 작품을 버전 관리
+- **언어**: 순수 C (raylib만 사용)
+- **특징**: 변경 없음, 자동 생성, 배포 가능
+- **용도**: 최종 결과물 보관, 포트폴리오
+- **빌드**: `make art NAME=artwork_name`
+
+#### `apps/` — 파라미터 튜닝 앱
+
+- **목적**: ImGui 패널로 실시간 파라미터 조정
+- **언어**: C++ (raylib + Dear ImGui 사용)
+- **특징**: GUI 있음, 인터랙티브
+- **용도**: 파라미터 최적화, 시뮬레이션 튜닝
+- **빌드**: `make app NAME=app_name`
+
+### 왜 이렇게 나눴나?
+
+| 측면 | src/ | artworks/ | apps/ |
+|------|------|-----------|-------|
+| **목적** | 개발 | 배포 | 연구 |
+| **언어** | C | C | C++ |
+| **GUI** | ❌ | ❌ | ✅ |
+| **수정** | 자주 | 거의 안 함 | 필요시 |
+| **바이너리 크기** | 작음 | 작음 | 중간 |
+| **의존성** | raylib | raylib | raylib + ImGui |
+
+### 왜 apps는 C++인가?
+
+Dear ImGui와 rlImGui는 **C++ 라이브러리**입니다.
+- 모든 소스가 C++로 작성됨
+- C 코드에서 C++ 라이브러리를 직접 호출 불가능
+- 따라서 ImGui를 사용하려면 C++로 작성해야 함
 
 ---
 
-## 9-1. apps/: imGui 앱 만들기
+## 4. Makefile과 빌드 방법
 
-`artworks/`가 정적인 결과물 아카이브라면, `apps/`는 imGui 패널로 파라미터를 실시간 조작하는 실험용 앱을 모아둡니다. imGui는 C++ 라이브러리이므로 `apps/*.cpp`는 `clang++`로 빌드됩니다.
+### Makefile 구조
+
+```makefile
+CC = clang                    # C 컴파일러
+CXX = clang++                 # C++ 컴파일러
+CFLAGS = -Wall -Wextra -std=c17
+CXXFLAGS = -Wall -Wextra -std=c++17
+LIBS = $(shell pkg-config --cflags --libs raylib)
+```
+
+### 빌드 타겟
+
+#### 실험 (src/main.c)
 
 ```bash
+make run       # 빌드 및 실행
+make           # 빌드만
+make clean     # 빌드 결과 삭제
+```
+
+#### 아트워크 (artworks/)
+
+```bash
+make art NAME=fireworks           # artworks/fireworks.c 빌드 및 실행
+make art NAME=particle_noise_field
+```
+
+사용 가능한 아트워크 목록:
+```bash
+ls artworks/*.c | sed 's/artworks\///' | sed 's/.c//'
+```
+
+#### 튜닝 앱 (apps/)
+
+```bash
+make app NAME=particle_tuner    # apps/particle_tuner.cpp 빌드 및 실행
 make app NAME=example_app
 ```
 
-기본 뼈대는 다음과 같습니다.
+### 새로운 앱 만들기
+
+1. `apps/my_app.cpp` 파일 생성
+2. 기본 템플릿:
 
 ```cpp
 #include "raylib.h"
@@ -365,16 +218,24 @@ make app NAME=example_app
 
 int main(void)
 {
-  InitWindow(1080, 720, "My App");
+  InitWindow(1200, 800, "My App");
+  SetTargetFPS(60);
   rlImGuiSetup(true);
 
   while (!WindowShouldClose())
   {
+    // 시뮬레이션 코드
+    
     BeginDrawing();
-    ClearBackground(DARKGRAY);
+    ClearBackground(BLACK);
 
+    // raylib 렌더링
+    
     rlImGuiBegin();
-    ImGui::ShowDemoWindow();   // 여기에 원하는 imGui 패널 구성
+    // ImGui 패널
+    ImGui::Begin("Settings");
+    ImGui::SliderFloat("Param", &param, 0.0f, 10.0f);
+    ImGui::End();
     rlImGuiEnd();
 
     EndDrawing();
@@ -386,219 +247,174 @@ int main(void)
 }
 ```
 
-`artworks/`와 마찬가지로 `make art NAME=<파일이름확장자제외>` 으로 개별 아트워크를 빌드/실행할 수 있습니다.
-
+3. 빌드:
 ```bash
-make art NAME=fireworks
+make app NAME=my_app
 ```
 
 ---
 
-## 9-2. 왜 apps/는 C++인가?
+## 5. 애플리케이션으로 만들어 배포
 
-`artworks/`는 순수 C로 작성되지만, `apps/`는 C++입니다. 그 이유는:
+### macOS: .app 번들 생성
 
-### 라이브러리 의존성
+#### 5-1. 수동 .app 번들 생성
 
-- **Dear ImGui**: C++ 라이브러리
-  - 모든 소스(`imgui.cpp`, `imgui_draw.cpp`, `imgui_widgets.cpp` 등)가 C++
-  - 클래스, 네임스페이스, C++ 기능 사용
+```bash
+# 1. 앱 번들 디렉토리 구조 생성
+mkdir -p MyArt.app/Contents/MacOS
+mkdir -p MyArt.app/Contents/Resources
+
+# 2. 바이너리 복사
+cp build/particle_tuner MyArt.app/Contents/MacOS/particle_tuner
+
+# 3. Info.plist 파일 생성
+cat > MyArt.app/Contents/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>particle_tuner</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.example.raylib-art</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>Particle Tuner</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+</dict>
+</plist>
+EOF
+
+# 4. 실행 가능 설정
+chmod +x MyArt.app/Contents/MacOS/particle_tuner
+
+# 5. 더블클릭으로 실행
+open MyArt.app
+```
+
+#### 5-2. Finder에서 .app 배포
+
+```bash
+# 생성한 .app을 zip으로 압축
+zip -r MyArt.zip MyArt.app
+
+# 또는 DMG 이미지 생성 (배포용)
+hdiutil create -volname MyArt -srcfolder . -ov -format UDZO MyArt.dmg
+```
+
+### Windows: .exe 실행파일 배포
+
+#### 5-1. 필요한 DLL 복사
+
+```bash
+# MinGW 환경에서 빌드 후
+mkdir MyArt
+cp build/particle_tuner.exe MyArt/
+cp /mingw64/bin/raylib.dll MyArt/
+cp /mingw64/bin/libgcc_s_seh-1.dll MyArt/
+cp /mingw64/bin/libwinpthread-1.dll MyArt/
+```
+
+#### 5-2. 인스톨러 생성 (NSIS)
+
+1. NSIS 설치: https://nsis.sourceforge.io/
+2. `installer.nsi` 파일 생성:
+
+```nsis
+!include "MUI2.nsh"
+
+Name "MyArt"
+OutFile "MyArt-installer.exe"
+InstallDir "$PROGRAMFILES\MyArt"
+
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+
+Section "Install"
+  SetOutPath "$INSTDIR"
+  File "MyArt\particle_tuner.exe"
+  File "MyArt\*.dll"
   
-- **rlImGui**: Dear ImGui의 raylib 백엔드
-  - `rlImGui.cpp`가 C++
-  - Dear ImGui를 호출하기 위해 C++로 작성됨
-
-### C와 C++의 호환성
-
-**C 코드에서 C++ 라이브러리를 직접 호출할 수 없습니다.**
-
-따라서 ImGui를 사용하는 코드는 C++로 작성해야 합니다.
-
-```cpp
-// C++에서는 이렇게 사용 가능
-ImGui::SliderFloat("Speed", &speed, 0.0f, 10.0f);
-ImGui::Button("Reset");
+  CreateDirectory "$SMPROGRAMS\MyArt"
+  CreateShortcut "$SMPROGRAMS\MyArt\MyArt.lnk" "$INSTDIR\particle_tuner.exe"
+  CreateShortcut "$DESKTOP\MyArt.lnk" "$INSTDIR\particle_tuner.exe"
+SectionEnd
 ```
 
-```c
-// C에서는 위 코드를 컴파일할 수 없음
-// (C++ 문법이기 때문)
+3. 빌드:
+```bash
+makensis installer.nsi
 ```
 
-### 프로젝트 구조의 의미
-
-```
-raylib-art/
-├── artworks/       (C)   순수 C, raylib만 사용, GUI 없음 → 결과물 아카이브
-└── apps/           (C++) C++, raylib + ImGui 사용 → 실시간 파라미터 튜닝
-```
-
-Makefile에서 `CC`(C 컴파일러)와 `CXX`(C++ 컴파일러)를 분리한 이유입니다.
-
-### 대안
-
-만약 순수 C로만 하고 싶다면:
-
-1. **cimgui 사용** — Dear ImGui의 C 바인딩 (커뮤니티 유지, 문서 적음)
-2. **다른 C GUI 라이브러리** — nuklear, raylib 내장 UI (기능이 제한적)
-
-하지만 **rlImGui + Dear ImGui** 조합이 raylib 생태계에서 사실상 표준이므로, C++를 선택하는 것이 가장 실용적입니다.
-
----
-
-## 9-3. 예제: particle_tuner.cpp
-
-`apps/particle_tuner.cpp`는 플로우 필드를 따라 움직이는 파티클을 시뮬레이션하고, ImGui 슬라이더로 파라미터를 실시간으로 조정하는 예제입니다.
+### Linux: AppImage 생성
 
 ```bash
-make app NAME=particle_tuner
+# AppImage 빌드 도구 설치
+wget https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+chmod +x appimagetool-x86_64.AppImage
+
+# AppDir 구조 생성
+mkdir -p MyArt.AppDir/usr/bin
+cp build/particle_tuner MyArt.AppDir/usr/bin/
+
+# AppImage 생성
+./appimagetool-x86_64.AppImage MyArt.AppDir MyArt.AppImage
+chmod +x MyArt.AppImage
 ```
-
-### 주요 기능
-
-- **플로우 필드**: 화면을 60×60 그리드로 나누고, 각 셀마다 방향 벡터 저장
-- **파티클 물리**: 가속도 → 속도 → 위치 순서로 매 프레임 업데이트
-- **sin/cos 조합**: 시간에 따라 변하는 부드러운 물결 패턴 생성
-
-### ImGui 파라미터
-
-| 파라미터 | 범위 | 설명 |
-|---------|------|------|
-| Time Speed | 0.0 ~ 0.02 | 플로우 필드 변화 속도 |
-| Acceleration | 0.1 ~ 1.5 | 파티클이 받는 힘의 크기 |
-| Spatial Freq | 0.01 ~ 0.3 | 플로우 패턴의 촘촘함 |
-| Particle Radius | 0.5 ~ 5.0 | 화면에 그려지는 파티클 크기 |
-| Trail Alpha | 0 ~ 50 | 잔상 효과 투명도 |
-| Particle Count | 100 ~ 5000 | 실제 렌더링할 파티클 개수 |
-
-### 코드 구조
-
-```cpp
-// 1. 파티클 구조체
-typedef struct {
-    Vector2 position;      // 위치
-    Vector2 velocity;      // 속도
-    Vector2 acceleration;  // 가속도
-    float maxSpeed;        // 최대 속도
-    Color color;           // 색상
-} Particle;
-
-// 2. 플로우 필드 (60x60 그리드)
-Vector2 flowField[COLS][ROWS];
-
-// 3. 매 프레임:
-// - 플로우 필드 업데이트 (sin/cos 조합)
-// - 파티클 물리 시뮬레이션 (가속도 적용, 속도 제한)
-// - raylib 렌더링 (파티클 그리기)
-// - ImGui 패널 (파라미터 조정)
-```
-
-슬라이더를 움직이며 각 파라미터가 시각화에 어떻게 영향을 미치는지 관찰하면서 학습할 수 있습니다.
 
 ---
 
-## 10. 다음 단계: C와 Generative Art
+## 6. 워크플로우 예시
 
-현재 프로그램은 단순히 원 하나를 그립니다.
-
-다음 단계부터 raylib을 C 언어 학습과 제너레이티브 아트 실험 환경으로 사용할 수 있습니다.
-
-학습 순서는 다음과 같이 진행하는 것을 권장합니다.
-
-```text
-C 기본 문법
-    ↓
-raylib 기본 Drawing API
-    ↓
-변수와 반복문
-    ↓
-배열
-    ↓
-struct
-    ↓
-포인터
-    ↓
-Vector2
-    ↓
-삼각함수
-    ↓
-랜덤
-    ↓
-Particle System
-    ↓
-Noise
-    ↓
-Flow Field
-    ↓
-Boids
-    ↓
-Cellular Automata
-    ↓
-Physarum
-    ↓
-GLSL Shader
-```
-
-예를 들어 다음과 같이 점의 위치를 변수로 관리하는 것부터 시작할 수 있습니다.
-
-```c
-float x = 400.0f;
-float y = 300.0f;
-float radius = 20.0f;
-```
-
-그다음 여러 개의 데이터를 배열로 관리합니다.
-
-```c
-Vector2 points[100];
-```
-
-그리고 더 발전시키면 하나의 입자를 구조체로 표현할 수 있습니다.
-
-```c
-typedef struct
-{
-    Vector2 position;
-    Vector2 velocity;
-    float radius;
-} Particle;
-```
-
-이렇게 `struct`, 배열, 포인터, 함수, 메모리 관리 등의 C 언어 개념을 실제 그래픽 알고리즘에 적용하면서 학습할 수 있습니다.
-
----
-
-## 11. 권장 작업 방식
-
-처음에는 다음 과정을 반복하는 것이 좋습니다.
-
-```text
-main.c 수정
-    ↓
-make
-    ↓
-./build/main
-    ↓
-결과 확인
-    ↓
-알고리즘 수정
-```
-
-그리고 익숙해지면:
+### 새로운 제너레이티브 아트 만들기
 
 ```bash
+# 1. src/main.c에서 알고리즘 개발
+nano src/main.c
+
+# 2. 빠르게 테스트
 make run
+
+# 3. 결과가 마음에 들면 artworks로 이동
+cp src/main.c artworks/my_new_art.c
+
+# 4. artworks에서 독립적으로 실행
+make art NAME=my_new_art
+
+# 5. src/main.c는 다음 실험 준비
+# (내용을 지우거나 수정해서 새로운 아이디어 시작)
 ```
 
-하나로 빌드와 실행을 처리합니다.
+### 파라미터 튜닝 앱 개발
 
-처음부터 복잡한 IDE 프로젝트 설정이나 CMake를 사용하기보다 `clang` 명령어를 직접 실행해 보는 이유는 C 프로그램이 어떻게 컴파일되고 raylib 라이브러리가 어떻게 링크되는지를 이해하기 위해서입니다.
+```bash
+# 1. 기존 알고리즘을 apps로 옮김
+cp artworks/particle_noise_field.c apps/flow_tuner.cpp
+# (C → C++로 변환, ImGui 패널 추가)
+
+# 2. 슬라이더로 파라미터 조정하며 테스트
+make app NAME=flow_tuner
+
+# 3. 최적 파라미터를 찾으면 배포용 .app/.exe 생성
+# (위의 "5. 애플리케이션으로 만들어 배포" 참고)
+```
 
 ---
 
-## 참고
+## 7. 참고 링크
 
-- raylib: https://www.raylib.com/
-- raylib GitHub: https://github.com/raysan5/raylib
-- Homebrew: https://brew.sh/
-- Homebrew raylib formula: https://formulae.brew.sh/formula/raylib
+- **raylib**: https://www.raylib.com/
+- **Dear ImGui**: https://github.com/ocornut/imgui
+- **rlImGui**: https://github.com/raylib-extras/rlImGui
+- **raylib GitHub**: https://github.com/raysan5/raylib
